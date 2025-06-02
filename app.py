@@ -46,7 +46,7 @@ if st.button("Analyse starten"):
                             img_base64 = base64.b64encode(buffered.getvalue()).decode()
 
                             response = openai.chat.completions.create(
-                                model="gpt-4-vision-preview",
+                                model="gpt-4o",
                                 messages=[
                                     {
                                         "role": "system",
