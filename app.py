@@ -15,6 +15,10 @@ st.write("Gib Produktseiten ein (z. B. von Vitra, Muuto etc.), und erhalte aut
 
 urls_input = st.text_area("🔗 Produkt-URLs eingeben (eine pro Zeile)")
 
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/117 Safari/537.36"
+}
+
 def translate_text(text, target_language):
     try:
         response = openai.chat.completions.create(
@@ -35,6 +39,14 @@ def translate_text(text, target_language):
     except Exception as e:
         return f"Übersetzungsfehler: {e}"
 
+def fetch_url_with_retries(url, retries=3, timeout=30):
+    for attempt in range(retries):
+        try:
+            return requests.get(url, headers=headers, timeout=timeout)
+        except requests.exceptions.RequestException:
+            time.sleep(2)
+    raise Exception(f"{retries} Verbindungsversuche fehlgeschlagen für {url}")
+
 if st.button("Analyse starten"):
     urls = [url.strip() for url in urls_input.split("\n") if url.strip()]
     results = []
@@ -42,7 +54,7 @@ if st.button("Analyse starten"):
     with st.spinner("Analysiere Seiten..."):
         for url in urls:
             try:
-                page = requests.get(url, timeout=10)
+                page = fetch_url_with_retries(url)
                 soup = BeautifulSoup(page.content, 'html.parser')
                 paragraphs = soup.find_all('p')
                 description = " ".join(p.text.strip() for p in paragraphs[:3])
@@ -52,10 +64,9 @@ if st.button("Analyse starten"):
                     img_url = img.get('src') or img.get('data-src')
                     if img_url and img_url.startswith("http"):
                         try:
-                            response = requests.get(img_url, timeout=10)
+                            response = fetch_url_with_retries(img_url)
                             image = Image.open(BytesIO(response.content))
 
-                            # Bild verkleinern für Vorschau
                             preview_image = image.copy()
                             preview_image.thumbnail((300, 300))
                             buffered = BytesIO()
@@ -63,7 +74,6 @@ if st.button("Analyse starten"):
                             preview_base64 = base64.b64encode(buffered.getvalue()).decode()
                             preview_html = f'<img src="data:image/png;base64,{preview_base64}">'
 
-                            # Originalbild codieren für Vision
                             buffered_full = BytesIO()
                             image.save(buffered_full, format="PNG")
                             buffered_full.seek(0)
